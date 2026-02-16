@@ -1,0 +1,26 @@
+# Excel и сгенерированные отчёты (опционально - раскомментируйте если не хотите коммитить)
+# *.xlsx
+# work_summary.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Next.js / Node
+web/node_modules/
+web/.next/
+web/out/
+web/.env*.local
+web/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

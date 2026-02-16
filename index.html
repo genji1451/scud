@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Отчет по рабочему времени</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Chart.js для графиков -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div>
+        <h1>Отчет по рабочему времени сотрудников</h1>
+        <p class="subtitle">
+          Период: декабрь–февраль, только рабочие дни (пн–пт). Данные загружаются из файла
+          <code>nov-feb 11.xlsx</code> и рассчитываются скриптом <code>generate_report.py</code>.
+        </p>
+      </div>
+      <div class="header-badge">
+        <span class="badge-label">Всего сотрудников</span>
+        <span class="badge-value" id="employeeCount">0</span>
+      </div>
+    </header>
+
+    <section class="controls">
+      <div class="control-group">
+        <label for="employeeSelect">Сотрудник:</label>
+        <select id="employeeSelect">
+          <option value="ALL">Все сотрудники</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="monthSelect">Месяц:</label>
+        <select id="monthSelect">
+          <option value="ALL">Все месяцы</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="weekSelect">Неделя:</label>
+        <select id="weekSelect">
+          <option value="ALL">Все недели</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="summary-cards">
+      <div class="card">
+        <div class="card-title">Всего часов за период</div>
+        <div class="card-value" id="totalHours">0 ч</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Среднее количество часов в день</div>
+        <div class="card-value" id="avgPerDay">0 ч</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Максимум часов в день</div>
+        <div class="card-value" id="maxPerDay">0 ч</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Количество рабочих дней в выборке</div>
+        <div class="card-value" id="workDaysCount">0</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Лидер по часам (по фильтру)</div>
+        <div class="card-value" id="topEmployee">—</div>
+      </div>
+      <div class="card highlight-card">
+        <div class="card-title">Чистое рабочее время (минус все перерывы)</div>
+        <div class="card-value" id="netWorkHours">0 ч</div>
+      </div>
+      <div class="card highlight-card">
+        <div class="card-title">Время работы минус обед</div>
+        <div class="card-value" id="workMinusLunch">0 ч</div>
+      </div>
+      <div class="card highlight-card">
+        <div class="card-title">Время работы минус перекуры</div>
+        <div class="card-value" id="workMinusSmoke">0 ч</div>
+      </div>
+    </section>
+
+    <section class="charts">
+      <div class="chart-container">
+        <h2 id="chartTitle">Часы работы по дням</h2>
+        <p class="chart-subtitle">
+          График показывает суммарное чистое рабочее время по выбранному периоду и сотруднику
+          (или по всем сотрудникам, если выбран параметр «Все сотрудники»).
+        </p>
+        <canvas id="workChart"></canvas>
+      </div>
+    </section>
+
+    <section class="table-section">
+      <h2>Детальная сводка по выбранному фильтру</h2>
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>Сотрудник</th>
+            <th>Дата</th>
+            <th>Пришел</th>
+            <th>Ушел</th>
+            <th>Чистое время (минус все)</th>
+            <th>Минус обед</th>
+            <th>Минус перекуры</th>
+            <th>Перерывы</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="breaks-section" id="breaksSection" style="display: none;">
+      <h2>Детализация перерывов</h2>
+      <table id="breaksTable">
+        <thead>
+          <tr>
+            <th>Сотрудник</th>
+            <th>Дата</th>
+            <th>Тип</th>
+            <th>Время выхода</th>
+            <th>Время возвращения</th>
+            <th>Длительность</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

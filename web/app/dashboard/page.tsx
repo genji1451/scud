@@ -451,7 +451,15 @@ function updateDashboardView(
       }
     }
 
-  // Chart
+  // Chart — градиент: 8 ч = зелёный, меньше 8 = к красному
+  const hoursToColor = (h: number) => {
+    const ratio = Math.min(1, Math.max(0, h / 8));
+    const r = Math.round(220 - 186 * ratio);
+    const g = Math.round(38 + 159 * ratio);
+    const b = Math.round(38 + 56 * ratio);
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
   if (chartInstanceRef.current) {
     chartInstanceRef.current.destroy();
     chartInstanceRef.current = null;
@@ -463,7 +471,11 @@ function updateDashboardView(
         type: 'bar',
         data: {
           labels: grouped.map((g) => g.key),
-          datasets: [{ label: 'Часы работы', data: grouped.map((g) => g.hours), backgroundColor: '#3b82f6' }],
+          datasets: [{
+            label: 'Часы работы',
+            data: grouped.map((g) => g.hours),
+            backgroundColor: grouped.map((g) => hoursToColor(g.hours)),
+          }],
         },
         options: {
           responsive: true,

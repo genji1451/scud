@@ -19,7 +19,10 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/data', { credentials: 'include' })
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 сек таймаут
+
+    fetch('/api/data', { credentials: 'include', signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error('Данные не загружены');
         return r.json();
@@ -29,9 +32,15 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message || 'Ошибка загрузки данных');
+        clearTimeout(timeoutId);
+        const msg = err.name === 'AbortError' ? 'Таймаут загрузки. Проверьте интернет и обновите страницу.' : (err.message || 'Ошибка загрузки данных');
+        setError(msg);
         setLoading(false);
       });
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, []);
 
   async function handleLogout() {
@@ -50,8 +59,15 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="app">
-        <p style={{ color: '#dc2626' }}>{error}</p>
+      <div className="app" style={{ padding: '2rem', textAlign: 'center' }}>
+        <p style={{ color: '#dc2626', marginBottom: '1rem' }}>{error}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}
+        >
+          Обновить страницу
+        </button>
       </div>
     );
   }

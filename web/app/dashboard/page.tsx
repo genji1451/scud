@@ -19,7 +19,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 сек таймаут
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     fetch('/api/data', { credentials: 'include', signal: controller.signal })
       .then((r) => {
@@ -32,7 +32,7 @@ export default function DashboardPage() {
       })
       .catch((err) => {
         clearTimeout(timeoutId);
-        const msg = err.name === 'AbortError' ? 'Таймаут загрузки. Проверьте интернет и обновите страницу.' : (err.message || 'Ошибка загрузки данных');
+        const msg = err.name === 'AbortError' ? 'Таймаут загрузки. Обновите страницу.' : (err.message || 'Ошибка загрузки данных');
         setError(msg);
         setLoading(false);
       });
@@ -51,22 +51,18 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="app">
-        <p>Загрузка данных...</p>
+        <div className="loading-state" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="app" style={{ padding: '2rem', textAlign: 'center' }}>
-        <p style={{ color: '#dc2626', marginBottom: '1rem' }}>{error}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}
-        >
-          Обновить страницу
-        </button>
+      <div className="app">
+        <div className="error-state">
+          <p style={{ color: 'var(--danger)' }}>{error}</p>
+          <button type="button" onClick={() => window.location.reload()}>Обновить</button>
+        </div>
       </div>
     );
   }
@@ -86,6 +82,11 @@ function getYearWeek(dateStr: string): string {
   const onejan = new Date(dt.getFullYear(), 0, 1);
   const week = Math.ceil((((dt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
   return `${y}-W${String(week).padStart(2, '0')}`;
+}
+
+function parseDate(dateStr: string): { d: number; m: number; y: number } {
+  const parts = dateStr.split('.').map(Number);
+  return { d: parts[0], m: parts[1], y: parts[2] };
 }
 
 function DashboardContent({
@@ -113,6 +114,7 @@ function DashboardContent({
   const [selectedEmployee, setSelectedEmployee] = useState('ALL');
   const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [selectedWeek, setSelectedWeek] = useState('ALL');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -120,126 +122,139 @@ function DashboardContent({
 
   useEffect(() => {
     if (!mounted || !rawData.length || typeof window === 'undefined') return;
-    updateDashboardView(rawData, chartRef, chartInstanceRef, selectedEmployee, selectedMonth, selectedWeek);
-  }, [mounted, rawData, chartRef, selectedEmployee, selectedMonth, selectedWeek]);
+    updateDashboardView(rawData, chartRef, chartInstanceRef, selectedEmployee, selectedMonth, selectedWeek, selectedDate);
+  }, [mounted, rawData, chartRef, selectedEmployee, selectedMonth, selectedWeek, selectedDate]);
+
+  const calendarMonth = selectedMonth !== 'ALL' ? selectedMonth : (monthKeys[0] || '12.2025');
+  const [calM, calY] = calendarMonth.split('.').map(Number);
+  const daysInMonth = new Date(calY, calM, 0).getDate();
+  const firstDayRaw = new Date(calY, calM - 1, 1).getDay();
+  const firstDay = firstDayRaw === 0 ? 6 : firstDayRaw - 1;
+  const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+  const hoursByDate = new Map<string, number>();
+  let filteredForCal = [...rawData];
+  if (selectedEmployee !== 'ALL') filteredForCal = filteredForCal.filter((r) => r['Сотрудник'] === selectedEmployee);
+  if (selectedWeek !== 'ALL') filteredForCal = filteredForCal.filter((r) => getYearWeek(r['Дата'] as string) === selectedWeek);
+  filteredForCal.forEach((r) => {
+    const dt = r['Дата'] as string;
+    const { m, y } = parseDate(dt);
+    if (m === calM && y === calY) {
+      const hrs = ((r.net_seconds as number) || 0) / 3600;
+      hoursByDate.set(dt, (hoursByDate.get(dt) || 0) + hrs);
+    }
+  });
+
+  const getDayColor = (day: number) => {
+    const dateStr = `${String(day).padStart(2, '0')}.${String(calM).padStart(2, '0')}.${calY}`;
+    const hrs = hoursByDate.get(dateStr) ?? 0;
+    const ratio = Math.min(1, Math.max(0, hrs / 8));
+    const r = Math.round(220 - 186 * ratio);
+    const g = Math.round(38 + 159 * ratio);
+    const b = Math.round(38 + 56 * ratio);
+    const dow = new Date(calY, calM - 1, day).getDay();
+    return { bg: `rgb(${r}, ${g}, ${b})`, isWeekend: dow === 0 || dow === 6 };
+  };
 
   return (
     <div className="app">
       <header className="app-header">
-        <div>
-          <h1>Отчет по рабочему времени сотрудников</h1>
-          <p className="subtitle">
-            Период: декабрь–февраль, только рабочие дни (пн–пт). Данные загружаются из файла
-            <code> nov-feb 11.xlsx</code> и рассчитываются скриптом <code>generate_report.py</code>.
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div className="header-badge">
-            <span className="badge-label">Всего сотрудников</span>
-            <span className="badge-value">{employees.length}</span>
-          </div>
-          <button type="button" className="logout-btn" onClick={onLogout}>
-            Выйти
-          </button>
-        </div>
+        <h1>Учёт рабочего времени</h1>
+        <button type="button" className="logout-btn" onClick={onLogout}>Выйти</button>
       </header>
 
       <section className="controls">
         <div className="control-group">
-          <label htmlFor="employeeSelect">Сотрудник:</label>
-          <select
-            id="employeeSelect"
-            value={selectedEmployee}
-            onChange={(e) => setSelectedEmployee(e.target.value)}
-          >
-            <option value="ALL">Все сотрудники</option>
+          <label htmlFor="employeeSelect">Сотрудник</label>
+          <select id="employeeSelect" value={selectedEmployee} onChange={(e) => { setSelectedEmployee(e.target.value); setSelectedDate(null); }}>
+            <option value="ALL">Все</option>
             {employees.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
+              <option key={name} value={name}>{name}</option>
             ))}
           </select>
         </div>
         <div className="control-group">
-          <label htmlFor="monthSelect">Месяц:</label>
-          <select
-            id="monthSelect"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-          >
-            <option value="ALL">Все месяцы</option>
+          <label htmlFor="monthSelect">Месяц</label>
+          <select id="monthSelect" value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setSelectedDate(null); }}>
+            <option value="ALL">Все</option>
             {monthKeys.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
+              <option key={m} value={m}>{m}</option>
             ))}
           </select>
         </div>
         <div className="control-group">
-          <label htmlFor="weekSelect">Неделя:</label>
-          <select
-            id="weekSelect"
-            value={selectedWeek}
-            onChange={(e) => setSelectedWeek(e.target.value)}
-          >
-            <option value="ALL">Все недели</option>
+          <label htmlFor="weekSelect">Неделя</label>
+          <select id="weekSelect" value={selectedWeek} onChange={(e) => { setSelectedWeek(e.target.value); setSelectedDate(null); }}>
+            <option value="ALL">Все</option>
             {weekKeys.map((w) => (
-              <option key={w} value={w}>
-                {w.replace('-', ' / ')}
-              </option>
+              <option key={w} value={w}>{w.replace('-', ' / ')}</option>
             ))}
           </select>
         </div>
+        {selectedDate && (
+          <button type="button" className="logout-btn" onClick={() => setSelectedDate(null)} style={{ marginLeft: 8 }}>
+            Сбросить дату
+          </button>
+        )}
       </section>
 
       <section className="summary-cards">
         <div className="card">
-          <div className="card-title">Всего часов за период</div>
+          <div className="card-title">Часов за период</div>
           <div className="card-value" id="totalHours">0 ч</div>
         </div>
-        <div className="card">
-          <div className="card-title">Среднее количество часов в день</div>
-          <div className="card-value" id="avgPerDay">0 ч</div>
-        </div>
-        <div className="card">
-          <div className="card-title">Максимум часов в день</div>
-          <div className="card-value" id="maxPerDay">0 ч</div>
-        </div>
-        <div className="card">
-          <div className="card-title">Количество рабочих дней в выборке</div>
-          <div className="card-value" id="workDaysCount">0</div>
-        </div>
-        <div className="card">
-          <div className="card-title">Лидер по часам (по фильтру)</div>
-          <div className="card-value" id="topEmployee">—</div>
-        </div>
-        <div className="card highlight-card">
-          <div className="card-title">Чистое рабочее время (минус все перерывы)</div>
+        <div className="card highlight">
+          <div className="card-title">Чистое время</div>
           <div className="card-value" id="netWorkHours">0 ч</div>
         </div>
-        <div className="card highlight-card">
-          <div className="card-title">Время работы минус обед</div>
-          <div className="card-value" id="workMinusLunch">0 ч</div>
+        <div className="card">
+          <div className="card-title">Рабочих дней</div>
+          <div className="card-value" id="workDaysCount">0</div>
         </div>
-        <div className="card highlight-card">
-          <div className="card-title">Время работы минус перекуры</div>
-          <div className="card-value" id="workMinusSmoke">0 ч</div>
+        <div className="card success">
+          <div className="card-title">Лидер</div>
+          <div className="card-value" id="topEmployee">—</div>
         </div>
       </section>
 
-      <section className="charts">
-        <div className="chart-container">
-          <h2 id="chartTitle">Часы работы по дням</h2>
-          <p className="chart-subtitle">
-            График показывает суммарное чистое рабочее время по выбранному периоду и сотруднику
-            (или по всем сотрудникам, если выбран параметр «Все сотрудники»).
-          </p>
-          <canvas ref={chartRef as React.Ref<HTMLCanvasElement>} id="workChart" />
+      <section className="calendar-section">
+        <h3>Календарь — {calendarMonth}</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 8 }}>
+          {weekdays.map((w) => (
+            <div key={w} className="calendar-weekday">{w}</div>
+          ))}
         </div>
+        <div className="calendar-grid">
+          {Array.from({ length: firstDay }, (_, i) => (
+            <div key={`e-${i}`} className="calendar-day empty" />
+          ))}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            const { bg, isWeekend } = getDayColor(day);
+            const dateStr = `${String(day).padStart(2, '0')}.${String(calM).padStart(2, '0')}.${calY}`;
+            const isSelected = selectedDate === dateStr;
+            return (
+              <div
+                key={day}
+                className={`calendar-day has-data ${isWeekend ? 'weekend' : ''} ${isSelected ? 'selected' : ''}`}
+                style={{ background: isWeekend ? 'var(--bg-dark)' : bg }}
+                onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                title={`${dateStr} — ${(hoursByDate.get(dateStr) ?? 0).toFixed(1)} ч`}
+              >
+                {day}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="chart-container">
+        <h3>Часы по дням</h3>
+        <canvas ref={chartRef as React.Ref<HTMLCanvasElement>} id="workChart" />
       </section>
 
       <section className="table-section">
-        <h2>Детальная сводка по выбранному фильтру</h2>
+        <h3>Детализация</h3>
         <table id="dataTable">
           <thead>
             <tr>
@@ -247,9 +262,7 @@ function DashboardContent({
               <th>Дата</th>
               <th>Пришел</th>
               <th>Ушел</th>
-              <th>Чистое время (минус все)</th>
-              <th>Минус обед</th>
-              <th>Минус перекуры</th>
+              <th>Часы</th>
               <th>Перерывы</th>
             </tr>
           </thead>
@@ -258,15 +271,15 @@ function DashboardContent({
       </section>
 
       <section className="breaks-section" id="breaksSection" style={{ display: 'none' }}>
-        <h2>Детализация перерывов</h2>
+        <h3>Перерывы</h3>
         <table id="breaksTable">
           <thead>
             <tr>
               <th>Сотрудник</th>
               <th>Дата</th>
               <th>Тип</th>
-              <th>Время выхода</th>
-              <th>Время возвращения</th>
+              <th>Выход</th>
+              <th>Возврат</th>
               <th>Длительность</th>
             </tr>
           </thead>
@@ -283,7 +296,8 @@ function updateDashboardView(
   chartInstanceRef: React.MutableRefObject<{ destroy: () => void } | null>,
   selectedEmployee: string,
   selectedMonth: string,
-  selectedWeek: string
+  selectedWeek: string,
+  selectedDate: string | null
 ) {
   if (!rawData || !Array.isArray(rawData)) return;
 
@@ -314,144 +328,99 @@ function updateDashboardView(
 
   const emp = selectedEmployee || 'ALL';
   let data = [...rawData];
-  if (emp !== 'ALL') {
-    data = data.filter((r) => r['Сотрудник'] === emp);
-  }
-  if (selectedMonth && selectedMonth !== 'ALL') {
-    data = data.filter((r) => (r['Дата'] as string).slice(3) === selectedMonth);
-  }
-  if (selectedWeek && selectedWeek !== 'ALL') {
-    data = data.filter((r) => getYearWeek(r['Дата'] as string) === selectedWeek);
-  }
+  if (emp !== 'ALL') data = data.filter((r) => r['Сотрудник'] === emp);
+  if (selectedMonth && selectedMonth !== 'ALL') data = data.filter((r) => (r['Дата'] as string).slice(3) === selectedMonth);
+  if (selectedWeek && selectedWeek !== 'ALL') data = data.filter((r) => getYearWeek(r['Дата'] as string) === selectedWeek);
+  if (selectedDate) data = data.filter((r) => r['Дата'] === selectedDate);
 
   const grouped = groupByKey(data, (r) => r['Дата'] as string)
-      .map((g) => {
-        const totalSeconds = g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0);
-        return { key: g.key, hours: totalSeconds / 3600, items: g.items };
-      })
-      .sort((a, b) => a.key.localeCompare(b.key));
+    .map((g) => ({
+      key: g.key,
+      hours: g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0) / 3600,
+      items: g.items,
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 
-    // Summary
-    const totalHours = grouped.reduce((sum, g) => sum + g.hours, 0);
-    const avgPerDay = grouped.length ? totalHours / grouped.length : 0;
-    const maxPerDay = grouped.reduce((max, g) => Math.max(max, g.hours), 0);
+  const totalHours = grouped.reduce((sum, g) => sum + g.hours, 0);
+  const totalNetHours = data.length > 0 ? data.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0) / 3600 : 0;
+  const byEmployee = groupByKey(data, (r) => r['Сотрудник'] as string)
+    .map((g) => ({ name: g.key, hours: g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0) / 3600 }))
+    .sort((a, b) => b.hours - a.hours);
 
-    const el = (id: string, text: string) => {
-      const e = document.getElementById(id);
-      if (e) e.textContent = text;
-    };
-    el('totalHours', formatHours(totalHours));
-    el('avgPerDay', formatHours(avgPerDay));
-    el('maxPerDay', formatHours(maxPerDay));
-    el('workDaysCount', String(grouped.length));
+  const el = (id: string, text: string) => {
+    const e = document.getElementById(id);
+    if (e) e.textContent = text;
+  };
+  el('totalHours', formatHours(totalHours));
+  el('netWorkHours', formatHours(totalNetHours));
+  el('workDaysCount', String(grouped.length));
+  el('topEmployee', byEmployee[0]?.hours > 0 ? `${byEmployee[0].name} (${formatHours(byEmployee[0].hours)})` : '—');
 
-    let totalNetHours = 0;
-    let totalMinusLunchHours = 0;
-    let totalMinusSmokeHours = 0;
-    if (data.length > 0) {
-      totalNetHours = data.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0) / 3600;
-      totalMinusLunchHours = data.reduce((sum, r) => sum + ((r.net_minus_lunch_seconds as number) || 0), 0) / 3600;
-      totalMinusSmokeHours = data.reduce((sum, r) => sum + ((r.net_minus_smoke_seconds as number) || 0), 0) / 3600;
-    }
-    el('netWorkHours', formatHours(totalNetHours));
-    el('workMinusLunch', formatHours(totalMinusLunchHours));
-    el('workMinusSmoke', formatHours(totalMinusSmokeHours));
+  const tbody = document.querySelector('#dataTable tbody');
+  if (tbody) {
+    tbody.innerHTML = '';
+    grouped.forEach((g) => {
+      const tr = document.createElement('tr');
+      let firstIn = '-', lastOut = '-', breaksText = '-';
+      let netHours = g.hours;
+      if (emp !== 'ALL' && g.items.length > 0) {
+        const item = g.items[0];
+        firstIn = (item['Первый вход'] as string) || '-';
+        lastOut = (item['Последний выход'] as string) || '-';
+        netHours = ((item.net_seconds as number) || 0) / 3600;
+        const breaks = (item.breaks as Array<Record<string, string>>) || [];
+        if (breaks.length) breaksText = breaks.map((b) => `${b['Тип'] === 'Обед' ? '🍽' : '☕'} ${b['Время выхода']}-${b['Время возвращения']}`).join(', ');
+      } else {
+        const totalNetSec = g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0);
+        netHours = totalNetSec / 3600;
+      }
+      tr.innerHTML = `
+        <td>${emp === 'ALL' ? 'Все' : emp}</td>
+        <td>${g.key}</td>
+        <td>${firstIn}</td>
+        <td>${lastOut}</td>
+        <td>${formatHours(netHours)}</td>
+        <td style="font-size:12px">${breaksText}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
 
-    const byEmployee = groupByKey(data, (r) => r['Сотрудник'] as string)
-      .map((g) => ({
-        name: g.key,
-        hours: g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0) / 3600,
-      }))
-      .sort((a, b) => b.hours - a.hours);
-    el('topEmployee', byEmployee[0]?.hours > 0 ? `${byEmployee[0].name} (${formatHours(byEmployee[0].hours)})` : '—');
-
-    // Table
-    const tbody = document.querySelector('#dataTable tbody');
-    if (tbody) {
-      tbody.innerHTML = '';
-      grouped.forEach((g) => {
-        const tr = document.createElement('tr');
-        let firstIn = '-';
-        let lastOut = '-';
-        let breaksText = '-';
-        let netHours = g.hours;
-        let minusLunchHours = 0;
-        let minusSmokeHours = 0;
-        if (emp !== 'ALL' && g.items.length > 0) {
-          const item = g.items[0];
-          firstIn = (item['Первый вход'] as string) || '-';
-          lastOut = (item['Последний выход'] as string) || '-';
-          netHours = ((item.net_seconds as number) || 0) / 3600;
-          minusLunchHours = ((item.net_minus_lunch_seconds as number) || 0) / 3600;
-          minusSmokeHours = ((item.net_minus_smoke_seconds as number) || 0) / 3600;
-          const breaks = (item.breaks as Array<Record<string, string>>) || [];
-          if (breaks.length > 0) {
-            breaksText = breaks.map((b) => `${b['Тип'] === 'Обед' ? '🍽️' : '🚬'} ${b['Время выхода']}-${b['Время возвращения']}`).join(', ');
-          }
-        } else {
-          const totalNetSec = g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0);
-          const totalMinusLunchSec = g.items.reduce((sum, r) => sum + ((r.net_minus_lunch_seconds as number) || 0), 0);
-          const totalMinusSmokeSec = g.items.reduce((sum, r) => sum + ((r.net_minus_smoke_seconds as number) || 0), 0);
-          netHours = totalNetSec / 3600;
-          minusLunchHours = totalMinusLunchSec / 3600;
-          minusSmokeHours = totalMinusSmokeSec / 3600;
-        }
-        tr.innerHTML = `
-          <td>${emp === 'ALL' ? 'Все сотрудники' : emp}</td>
-          <td>${g.key}</td>
-          <td>${firstIn}</td>
-          <td>${lastOut}</td>
-          <td>${formatHours(netHours)}</td>
-          <td>${formatHours(minusLunchHours)}</td>
-          <td>${formatHours(minusSmokeHours)}</td>
-          <td style="font-size:12px">${breaksText}</td>
-        `;
-        tbody.appendChild(tr);
+  const breaksSection = document.getElementById('breaksSection');
+  const breaksTbody = document.querySelector('#breaksTable tbody');
+  if (breaksSection && breaksTbody) {
+    breaksTbody.innerHTML = '';
+    if (emp === 'ALL') {
+      breaksSection.style.display = 'none';
+    } else {
+      const allBreaks: Array<Record<string, unknown>> = [];
+      data.forEach((item) => {
+        ((item.breaks as Array<Record<string, unknown>>) || []).forEach((b) => {
+          allBreaks.push({ Сотрудник: item['Сотрудник'], Дата: item['Дата'], ...b });
+        });
       });
-    }
-
-    // Breaks section
-    const breaksSection = document.getElementById('breaksSection');
-    const breaksTbody = document.querySelector('#breaksTable tbody');
-    if (breaksSection && breaksTbody) {
-      breaksTbody.innerHTML = '';
-      if (emp === 'ALL') {
+      if (allBreaks.length === 0) {
         breaksSection.style.display = 'none';
       } else {
-        const allBreaks: Array<Record<string, unknown>> = [];
-        data.forEach((item) => {
-          const breaks = (item.breaks as Array<Record<string, unknown>>) || [];
-          breaks.forEach((b) => {
-            allBreaks.push({
-              Сотрудник: item['Сотрудник'],
-              Дата: item['Дата'],
-              ...b,
-            });
-          });
+        breaksSection.style.display = 'block';
+        allBreaks.forEach((b) => {
+          const tr = document.createElement('tr');
+          const icon = b['Тип'] === 'Обед' ? '🍽' : '☕';
+          const cls = b['Тип'] === 'Обед' ? 'lunch' : 'smoke';
+          tr.innerHTML = `
+            <td>${b['Сотрудник']}</td>
+            <td>${b['Дата']}</td>
+            <td><span class="break-type ${cls}">${icon} ${b['Тип']}</span></td>
+            <td>${b['Время выхода']}</td>
+            <td>${b['Время возвращения']}</td>
+            <td>${formatDuration((b['Длительность_сек'] as number) || 0)}</td>
+          `;
+          breaksTbody.appendChild(tr);
         });
-        if (allBreaks.length === 0) {
-          breaksSection.style.display = 'none';
-        } else {
-          breaksSection.style.display = 'block';
-          allBreaks.forEach((b) => {
-            const tr = document.createElement('tr');
-            const icon = b['Тип'] === 'Обед' ? '🍽️' : '🚬';
-            const cls = b['Тип'] === 'Обед' ? 'lunch' : 'smoke';
-            tr.innerHTML = `
-              <td>${b['Сотрудник']}</td>
-              <td>${b['Дата']}</td>
-              <td><span class="break-type ${cls}">${icon} ${b['Тип']}</span></td>
-              <td>${b['Время выхода']}</td>
-              <td>${b['Время возвращения']}</td>
-              <td>${formatDuration((b['Длительность_сек'] as number) || 0)}</td>
-            `;
-            breaksTbody.appendChild(tr);
-          });
-        }
       }
     }
+  }
 
-  // Chart — градиент: 8 ч = зелёный, меньше 8 = к красному
   const hoursToColor = (h: number) => {
     const ratio = Math.min(1, Math.max(0, h / 8));
     const r = Math.round(220 - 186 * ratio);
@@ -472,14 +441,42 @@ function updateDashboardView(
         data: {
           labels: grouped.map((g) => g.key),
           datasets: [{
-            label: 'Часы работы',
+            label: 'Часы',
             data: grouped.map((g) => g.hours),
             backgroundColor: grouped.map((g) => hoursToColor(g.hours)),
+            borderRadius: 6,
           }],
         },
         options: {
           responsive: true,
-          scales: { y: { beginAtZero: true, title: { display: true, text: 'Часы' } } },
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1a2332',
+              titleColor: '#e8eef4',
+              bodyColor: '#e8eef4',
+              borderColor: '#2d3a4f',
+              borderWidth: 1,
+              padding: 12,
+              callbacks: {
+                label: (ctx: { raw: number }) => ` ${ctx.raw.toFixed(1)} ч`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: '#2d3a4f' },
+              ticks: { color: '#8b9cb3', maxRotation: 45 },
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: '#2d3a4f' },
+              ticks: { color: '#8b9cb3' },
+              title: { display: true, text: 'Часы', color: '#8b9cb3' },
+            },
+          },
+          animation: { duration: 400 },
         },
       });
       chartInstanceRef.current = ch;

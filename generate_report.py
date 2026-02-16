@@ -19,9 +19,23 @@ OUTPUT_FILE = 'weekly_report.xlsx'
 BREAKS_FILE = 'breaks_report.xlsx'
 
 EXCLUDE_NAMES = [
-    'Сапаев Дмитрий', 
-    'Чамурлиева Майя', 
-    'Калинкин Илья'
+    'Сапаев Дмитрий',
+    'Чамурлиева Майя',
+    'Калинкин Илья',
+    'Голубитченко',
+    'Мажникова',
+    'Петрухин',
+    'Сапаева Мария',
+    'Сапаева Светлана',
+    'Все свободные',
+    'Сусоева',
+    'Ястребова',
+]
+
+# Строки для исключения из статистики: (Сотрудник, Дата). Эти дни не попадут в отчёты и на сайт.
+EXCLUDE_ROWS = [
+    # ('Фамилия Имя Отчество', '03.12.2025'),
+    # ('Другой сотрудник', '15.01.2026'),
 ]
 
 def generate_report():
@@ -90,8 +104,14 @@ def generate_report():
     employee_data = {} 
     
     grouped = df.groupby(['Full Name', 'Date'])
-    
+    exclude_set = {(e, d) for e, d in EXCLUDE_ROWS}
+    if exclude_set:
+        print(f"Исключено строк из статистики: {len(exclude_set)} (см. EXCLUDE_ROWS)")
+
     for (name, date), group in grouped:
+        date_str = date.strftime('%d.%m.%Y')
+        if (name, date_str) in exclude_set:
+            continue
         if name not in employee_data:
             employee_data[name] = {}
             

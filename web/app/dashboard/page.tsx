@@ -460,12 +460,18 @@ function runDashboardScript() {
     }
   };
 
-  // Init
+  // Init — сохраняем выбранные значения перед перезаписью, чтобы не сбрасывать при обновлении графика
   const employees = Array.from(new Set(rawData.map((r) => r['Сотрудник'] as string))).sort();
   const empCount = document.getElementById('employeeCount');
   if (empCount) empCount.textContent = String(employees.length);
 
-  const empSelect = document.getElementById('employeeSelect');
+  const empSelect = document.getElementById('employeeSelect') as HTMLSelectElement | null;
+  const monthSelect = document.getElementById('monthSelect') as HTMLSelectElement | null;
+  const weekSelect = document.getElementById('weekSelect') as HTMLSelectElement | null;
+  const savedEmp = empSelect?.value;
+  const savedMonth = monthSelect?.value;
+  const savedWeek = weekSelect?.value;
+
   if (empSelect) {
     empSelect.innerHTML = '<option value="ALL">Все сотрудники</option>';
     employees.forEach((name) => {
@@ -474,10 +480,10 @@ function runDashboardScript() {
       opt.textContent = name;
       empSelect.appendChild(opt);
     });
+    if (savedEmp && employees.includes(savedEmp)) empSelect.value = savedEmp;
   }
 
   const monthKeys = Array.from(new Set(rawData.map((r) => (r['Дата'] as string).slice(3)))).sort();
-  const monthSelect = document.getElementById('monthSelect');
   if (monthSelect) {
     monthSelect.innerHTML = '<option value="ALL">Все месяцы</option>';
     monthKeys.forEach((m) => {
@@ -486,10 +492,10 @@ function runDashboardScript() {
       opt.textContent = m;
       monthSelect.appendChild(opt);
     });
+    if (savedMonth && monthKeys.includes(savedMonth)) monthSelect.value = savedMonth;
   }
 
   const weekKeys = Array.from(new Set(rawData.map((r) => getYearWeek(r['Дата'] as string)))).sort();
-  const weekSelect = document.getElementById('weekSelect');
   if (weekSelect) {
     weekSelect.innerHTML = '<option value="ALL">Все недели</option>';
     weekKeys.forEach((w) => {
@@ -498,10 +504,19 @@ function runDashboardScript() {
       opt.textContent = w.replace('-', ' / ');
       weekSelect.appendChild(opt);
     });
+    if (savedWeek && weekKeys.includes(savedWeek)) weekSelect.value = savedWeek;
   }
 
+  // onchange заменяет предыдущий обработчик — избегаем дублирования при повторных вызовах
+  const handler = () => {
+    try {
+      updateView();
+    } catch (e) {
+      console.error('updateView error:', e);
+    }
+  };
   [empSelect, monthSelect, weekSelect].forEach((el) => {
-    el?.addEventListener('change', updateView);
+    if (el) el.onchange = handler;
   });
 
   updateView();

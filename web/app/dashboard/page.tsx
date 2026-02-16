@@ -13,7 +13,6 @@ declare global {
 export default function DashboardPage() {
   const router = useRouter();
   const chartRef = useRef<HTMLCanvasElement>(null);
-  const [chart, setChart] = useState<{ destroy: () => void } | null>(null);
   const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -75,31 +74,45 @@ export default function DashboardPage() {
   return (
     <>
       <Script src="https://cdn.jsdelivr.net/npm/chart.js" strategy="afterInteractive" />
-      <DashboardContent
-        rawData={rawData}
-        chartRef={chartRef}
-        chart={chart}
-        setChart={setChart}
-        onLogout={handleLogout}
-      />
+      <DashboardContent rawData={rawData} chartRef={chartRef} onLogout={handleLogout} />
     </>
   );
+}
+
+function getYearWeek(dateStr: string): string {
+  const parts = dateStr.split('.').map(Number);
+  const [d, m, y] = parts;
+  const dt = new Date(y, m - 1, d);
+  const onejan = new Date(dt.getFullYear(), 0, 1);
+  const week = Math.ceil((((dt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+  return `${y}-W${String(week).padStart(2, '0')}`;
 }
 
 function DashboardContent({
   rawData,
   chartRef,
-  chart,
-  setChart,
   onLogout,
 }: {
   rawData: Record<string, unknown>[];
   chartRef: React.RefObject<HTMLCanvasElement | null>;
-  chart: { destroy: () => void } | null;
-  setChart: (c: { destroy: () => void } | null) => void;
   onLogout: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const chartInstanceRef = useRef<{ destroy: () => void } | null>(null);
+
+  const employees = Array.from(new Set(rawData.map((r) => r['Сотрудник'] as string))).sort();
+  const monthKeys = Array.from(new Set(rawData.map((r) => (r['Дата'] as string).slice(3)))).sort(
+    (a, b) => {
+      const [ma, ya] = a.split('.').map(Number);
+      const [mb, yb] = b.split('.').map(Number);
+      return ya !== yb ? ya - yb : ma - mb;
+    }
+  );
+  const weekKeys = Array.from(new Set(rawData.map((r) => getYearWeek(r['Дата'] as string)))).sort();
+
+  const [selectedEmployee, setSelectedEmployee] = useState('ALL');
+  const [selectedMonth, setSelectedMonth] = useState('ALL');
+  const [selectedWeek, setSelectedWeek] = useState('ALL');
 
   useEffect(() => {
     setMounted(true);
@@ -107,18 +120,8 @@ function DashboardContent({
 
   useEffect(() => {
     if (!mounted || !rawData.length || typeof window === 'undefined') return;
-    const w = window as unknown as {
-      rawData: Record<string, unknown>[];
-  chartRef: React.RefObject<HTMLCanvasElement | null>;
-  chart: { destroy: () => void } | null;
-  setChart: (c: { destroy: () => void } | null) => void;
-    };
-    w.rawData = rawData;
-    w.chartRef = chartRef;
-    w.chart = chart;
-    w.setChart = setChart;
-    runDashboardScript();
-  }, [mounted, rawData, chartRef, chart, setChart]);
+    updateDashboardView(rawData, chartRef, chartInstanceRef, selectedEmployee, selectedMonth, selectedWeek);
+  }, [mounted, rawData, chartRef, selectedEmployee, selectedMonth, selectedWeek]);
 
   return (
     <div className="app">
@@ -133,7 +136,7 @@ function DashboardContent({
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div className="header-badge">
             <span className="badge-label">Всего сотрудников</span>
-            <span className="badge-value" id="employeeCount">0</span>
+            <span className="badge-value">{employees.length}</span>
           </div>
           <button type="button" className="logout-btn" onClick={onLogout}>
             Выйти
@@ -144,20 +147,47 @@ function DashboardContent({
       <section className="controls">
         <div className="control-group">
           <label htmlFor="employeeSelect">Сотрудник:</label>
-          <select id="employeeSelect">
+          <select
+            id="employeeSelect"
+            value={selectedEmployee}
+            onChange={(e) => setSelectedEmployee(e.target.value)}
+          >
             <option value="ALL">Все сотрудники</option>
+            {employees.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
         </div>
         <div className="control-group">
           <label htmlFor="monthSelect">Месяц:</label>
-          <select id="monthSelect">
+          <select
+            id="monthSelect"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+          >
             <option value="ALL">Все месяцы</option>
+            {monthKeys.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
           </select>
         </div>
         <div className="control-group">
           <label htmlFor="weekSelect">Неделя:</label>
-          <select id="weekSelect">
+          <select
+            id="weekSelect"
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(e.target.value)}
+          >
             <option value="ALL">Все недели</option>
+            {weekKeys.map((w) => (
+              <option key={w} value={w}>
+                {w.replace('-', ' / ')}
+              </option>
+            ))}
           </select>
         </div>
       </section>
@@ -247,8 +277,14 @@ function DashboardContent({
   );
 }
 
-function runDashboardScript() {
-  const rawData = (window as unknown as { rawData: Record<string, unknown>[] }).rawData;
+function updateDashboardView(
+  rawData: Record<string, unknown>[],
+  chartRef: React.RefObject<HTMLCanvasElement | null>,
+  chartInstanceRef: React.MutableRefObject<{ destroy: () => void } | null>,
+  selectedEmployee: string,
+  selectedMonth: string,
+  selectedWeek: string
+) {
   if (!rawData || !Array.isArray(rawData)) return;
 
   const formatHours = (h: number) => {
@@ -276,35 +312,19 @@ function runDashboardScript() {
     return Array.from(map.entries()).map(([key, items]) => ({ key, items }));
   };
 
-  const getYearWeek = (dateStr: string) => {
-    const parts = dateStr.split('.').map(Number);
-    const [d, m, y] = parts;
-    const dt = new Date(y, m - 1, d);
-    const onejan = new Date(dt.getFullYear(), 0, 1);
-    const week = Math.ceil((((dt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
-    return `${y}-W${String(week).padStart(2, '0')}`;
-  };
+  const emp = selectedEmployee || 'ALL';
+  let data = [...rawData];
+  if (emp !== 'ALL') {
+    data = data.filter((r) => r['Сотрудник'] === emp);
+  }
+  if (selectedMonth && selectedMonth !== 'ALL') {
+    data = data.filter((r) => (r['Дата'] as string).slice(3) === selectedMonth);
+  }
+  if (selectedWeek && selectedWeek !== 'ALL') {
+    data = data.filter((r) => getYearWeek(r['Дата'] as string) === selectedWeek);
+  }
 
-  const updateView = () => {
-    const employeeSelect = document.getElementById('employeeSelect') as HTMLSelectElement;
-    const monthSelect = document.getElementById('monthSelect') as HTMLSelectElement;
-    const weekSelect = document.getElementById('weekSelect') as HTMLSelectElement;
-    const selectedEmployee = employeeSelect?.value || 'ALL';
-
-    let data = [...rawData];
-    if (selectedEmployee !== 'ALL') {
-      data = data.filter((r) => r['Сотрудник'] === selectedEmployee);
-    }
-    const selectedMonth = monthSelect?.value;
-    if (selectedMonth && selectedMonth !== 'ALL') {
-      data = data.filter((r) => (r['Дата'] as string).slice(3) === selectedMonth);
-    }
-    const selectedWeek = weekSelect?.value;
-    if (selectedWeek && selectedWeek !== 'ALL') {
-      data = data.filter((r) => getYearWeek(r['Дата'] as string) === selectedWeek);
-    }
-
-    const grouped = groupByKey(data, (r) => r['Дата'] as string)
+  const grouped = groupByKey(data, (r) => r['Дата'] as string)
       .map((g) => {
         const totalSeconds = g.items.reduce((sum, r) => sum + ((r.net_seconds as number) || 0), 0);
         return { key: g.key, hours: totalSeconds / 3600, items: g.items };
@@ -357,7 +377,7 @@ function runDashboardScript() {
         let netHours = g.hours;
         let minusLunchHours = 0;
         let minusSmokeHours = 0;
-        if (selectedEmployee !== 'ALL' && g.items.length > 0) {
+        if (emp !== 'ALL' && g.items.length > 0) {
           const item = g.items[0];
           firstIn = (item['Первый вход'] as string) || '-';
           lastOut = (item['Последний выход'] as string) || '-';
@@ -377,7 +397,7 @@ function runDashboardScript() {
           minusSmokeHours = totalMinusSmokeSec / 3600;
         }
         tr.innerHTML = `
-          <td>${selectedEmployee === 'ALL' ? 'Все сотрудники' : selectedEmployee}</td>
+          <td>${emp === 'ALL' ? 'Все сотрудники' : emp}</td>
           <td>${g.key}</td>
           <td>${firstIn}</td>
           <td>${lastOut}</td>
@@ -395,7 +415,7 @@ function runDashboardScript() {
     const breaksTbody = document.querySelector('#breaksTable tbody');
     if (breaksSection && breaksTbody) {
       breaksTbody.innerHTML = '';
-      if (selectedEmployee === 'ALL') {
+      if (emp === 'ALL') {
         breaksSection.style.display = 'none';
       } else {
         const allBreaks: Array<Record<string, unknown>> = [];
@@ -431,21 +451,15 @@ function runDashboardScript() {
       }
     }
 
-    // Chart
-    const w = window as unknown as {
-      chartRef: React.RefObject<HTMLCanvasElement | null>;
-      setChart: (c: { destroy: () => void } | null) => void;
-      chart: { destroy: () => void } | null;
-    };
-    const canvasRef = w.chartRef;
-    const setChartFn = w.setChart;
-    const prevChart = w.chart;
-    if (prevChart) prevChart.destroy();
-    if (typeof window !== 'undefined' && window.Chart && canvasRef?.current) {
-      const Chart = window.Chart;
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-      const ch = new Chart(ctx, {
+  // Chart
+  if (chartInstanceRef.current) {
+    chartInstanceRef.current.destroy();
+    chartInstanceRef.current = null;
+  }
+  if (typeof window !== 'undefined' && window.Chart && chartRef?.current) {
+    const ctx = chartRef.current.getContext('2d');
+    if (ctx) {
+      const ch = new window.Chart(ctx, {
         type: 'bar',
         data: {
           labels: grouped.map((g) => g.key),
@@ -456,68 +470,7 @@ function runDashboardScript() {
           scales: { y: { beginAtZero: true, title: { display: true, text: 'Часы' } } },
         },
       });
-      if (setChartFn) setChartFn(ch);
+      chartInstanceRef.current = ch;
     }
-  };
-
-  // Init — сохраняем выбранные значения перед перезаписью, чтобы не сбрасывать при обновлении графика
-  const employees = Array.from(new Set(rawData.map((r) => r['Сотрудник'] as string))).sort();
-  const empCount = document.getElementById('employeeCount');
-  if (empCount) empCount.textContent = String(employees.length);
-
-  const empSelect = document.getElementById('employeeSelect') as HTMLSelectElement | null;
-  const monthSelect = document.getElementById('monthSelect') as HTMLSelectElement | null;
-  const weekSelect = document.getElementById('weekSelect') as HTMLSelectElement | null;
-  const savedEmp = empSelect?.value;
-  const savedMonth = monthSelect?.value;
-  const savedWeek = weekSelect?.value;
-
-  if (empSelect) {
-    empSelect.innerHTML = '<option value="ALL">Все сотрудники</option>';
-    employees.forEach((name) => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      empSelect.appendChild(opt);
-    });
-    if (savedEmp && employees.includes(savedEmp)) empSelect.value = savedEmp;
   }
-
-  const monthKeys = Array.from(new Set(rawData.map((r) => (r['Дата'] as string).slice(3)))).sort();
-  if (monthSelect) {
-    monthSelect.innerHTML = '<option value="ALL">Все месяцы</option>';
-    monthKeys.forEach((m) => {
-      const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = m;
-      monthSelect.appendChild(opt);
-    });
-    if (savedMonth && monthKeys.includes(savedMonth)) monthSelect.value = savedMonth;
-  }
-
-  const weekKeys = Array.from(new Set(rawData.map((r) => getYearWeek(r['Дата'] as string)))).sort();
-  if (weekSelect) {
-    weekSelect.innerHTML = '<option value="ALL">Все недели</option>';
-    weekKeys.forEach((w) => {
-      const opt = document.createElement('option');
-      opt.value = w;
-      opt.textContent = w.replace('-', ' / ');
-      weekSelect.appendChild(opt);
-    });
-    if (savedWeek && weekKeys.includes(savedWeek)) weekSelect.value = savedWeek;
-  }
-
-  // onchange заменяет предыдущий обработчик — избегаем дублирования при повторных вызовах
-  const handler = () => {
-    try {
-      updateView();
-    } catch (e) {
-      console.error('updateView error:', e);
-    }
-  };
-  [empSelect, monthSelect, weekSelect].forEach((el) => {
-    if (el) el.onchange = handler;
-  });
-
-  updateView();
 }

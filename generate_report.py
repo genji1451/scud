@@ -5,6 +5,8 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import datetime
 import locale
+from pathlib import Path
+import sys
 
 try:
     locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
@@ -14,7 +16,10 @@ except:
     except:
         pass
 
-INPUT_FILE = 'nov-feb 11.xlsx'
+DEFAULT_INPUT_FILES = [
+    'nov-feb 11.xlsx',
+    'nov-feb 11 2.xlsx',
+]
 OUTPUT_FILE = 'weekly_report.xlsx'
 BREAKS_FILE = 'breaks_report.xlsx'
 
@@ -30,11 +35,6 @@ EXCLUDE_NAMES = [
     'Все свободные',
     'Сусоева',
     'Ястребова',
-    'Свободная 11',
-    'Свободная 9',
-    'Свободная 2',
-    'Свободная 3',
-    'Свободная 7',
 ]
 
 # Строки для исключения из статистики: (Сотрудник, Дата). Эти дни не попадут в отчёты и на сайт.
@@ -43,12 +43,51 @@ EXCLUDE_ROWS = [
     # ('Другой сотрудник', '15.01.2026'),
 ]
 
+def read_input_files(input_files: list[str]) -> pd.DataFrame:
+    dfs: list[pd.DataFrame] = []
+    for file in input_files:
+        path = Path(file)
+        if not path.exists():
+            print(f"WARNING: File not found: {file}")
+            continue
+        print(f"Reading {file}...")
+        try:
+            df_part = pd.read_excel(file, header=3)
+        except Exception as e:
+            print(f"Error reading file {file}: {e}")
+            continue
+        df_part['__source_file'] = str(file)
+        dfs.append(df_part)
+
+    if not dfs:
+        raise FileNotFoundError(
+            "No input Excel files were loaded. "
+            "Pass file paths as arguments, e.g.: "
+            "python3 generate_report.py \"nov-feb 11.xlsx\" \"nov-feb 11 2.xlsx\""
+        )
+
+    df_all = pd.concat(dfs, ignore_index=True)
+
+    # Удаляем возможные дубли событий при склейке файлов
+    dedupe_cols = [
+        c for c in ['Фамилия', 'Имя', 'Отчество', 'Дата события', 'Устройство', 'Событие', 'Выход']
+        if c in df_all.columns
+    ]
+    if dedupe_cols:
+        before = len(df_all)
+        df_all = df_all.drop_duplicates(subset=dedupe_cols)
+        after = len(df_all)
+        if after != before:
+            print(f"Deduplicated events: {before - after}")
+
+    return df_all
+
 def generate_report():
-    print(f"Reading {INPUT_FILE}...")
     try:
-        df = pd.read_excel(INPUT_FILE, header=3)
+        input_files = sys.argv[1:] if len(sys.argv) > 1 else DEFAULT_INPUT_FILES
+        df = read_input_files(input_files)
     except Exception as e:
-        print(f"Error reading file: {e}")
+        print(f"Error reading input files: {e}")
         return
 
     # Basic cleanup

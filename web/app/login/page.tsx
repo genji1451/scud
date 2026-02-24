@@ -40,8 +40,8 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-box">
-        <h1>Вход</h1>
-        <p>Учёт рабочего времени</p>
+        <h1>Вход в систему</h1>
+        <p>Отчет по рабочему времени сотрудников</p>
 
         <form onSubmit={handleSubmit}>
           {error && <div className="login-error">{error}</div>}

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Учёт рабочего времени',
-  description: 'Дашборд учёта рабочего времени сотрудников',
+  title: 'Отчет по рабочему времени',
+  description: 'Дашборд учета рабочего времени сотрудников',
 };
 
 export default function RootLayout({

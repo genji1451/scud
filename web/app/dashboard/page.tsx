@@ -198,8 +198,7 @@ function DashboardContent({
         <div>
           <h1>Отчет по рабочему времени сотрудников</h1>
           <p className="subtitle">
-            Период: декабрь–февраль, только рабочие дни (пн–пт). Данные загружаются из файла
-            <code> nov-feb 11.xlsx</code> и рассчитываются скриптом <code>generate_report.py</code>.
+            Период: декабрь–февраль, только рабочие дни (пн–пт). 
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>

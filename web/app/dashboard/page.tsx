@@ -101,6 +101,7 @@ function DashboardContent({
   const chartInstanceRef = useRef<{ destroy: () => void } | null>(null);
 
   const employees = Array.from(new Set(rawData.map((r) => r['Сотрудник'] as string))).sort();
+
   const monthKeys = Array.from(new Set(rawData.map((r) => (r['Дата'] as string).slice(3)))).sort(
     (a, b) => {
       const [ma, ya] = a.split('.').map(Number);
@@ -108,11 +109,79 @@ function DashboardContent({
       return ya !== yb ? ya - yb : ma - mb;
     }
   );
-  const weekKeys = Array.from(new Set(rawData.map((r) => getYearWeek(r['Дата'] as string)))).sort();
+
+  // Группируем недели по месяцам, чтобы показывать «1 неделя февраля», «2 неделя февраля» и т.д.
+  const weeksByMonth: Record<string, string[]> = {};
+  rawData.forEach((r) => {
+    const dateStr = r['Дата'] as string;
+    const monthKey = dateStr.slice(3); // "MM.YYYY"
+    const wk = getYearWeek(dateStr);   // "YYYY-Www"
+    if (!weeksByMonth[monthKey]) weeksByMonth[monthKey] = [];
+    if (!weeksByMonth[monthKey].includes(wk)) weeksByMonth[monthKey].push(wk);
+  });
+  Object.keys(weeksByMonth).forEach((mk) => {
+    weeksByMonth[mk].sort((a, b) => {
+      const wa = Number(a.split('-W')[1] || '0');
+      const wb = Number(b.split('-W')[1] || '0');
+      return wa - wb;
+    });
+  });
+
+  const allWeekKeys = Array.from(
+    new Set(Object.values(weeksByMonth).flat())
+  ).sort((a, b) => {
+    const wa = Number(a.split('-W')[1] || '0');
+    const wb = Number(b.split('-W')[1] || '0');
+    return wa - wb;
+  });
 
   const [selectedEmployee, setSelectedEmployee] = useState('ALL');
   const [selectedMonth, setSelectedMonth] = useState('ALL');
   const [selectedWeek, setSelectedWeek] = useState('ALL');
+
+  const visibleWeekKeys =
+    selectedMonth === 'ALL' ? allWeekKeys : weeksByMonth[selectedMonth] || [];
+
+  const monthKeyToLabelGenitive = (monthKey: string): string => {
+    const [mStr, year] = monthKey.split('.');
+    const m = Number(mStr);
+    const names: Record<number, string> = {
+      1: 'января',
+      2: 'февраля',
+      3: 'марта',
+      4: 'апреля',
+      5: 'мая',
+      6: 'июня',
+      7: 'июля',
+      8: 'августа',
+      9: 'сентября',
+      10: 'октября',
+      11: 'ноября',
+      12: 'декабря',
+    };
+    const base = names[m] || monthKey;
+    return `${base} ${year}`;
+  };
+
+  const weekLabel = (weekKey: string): string => {
+    if (!weekKey) return '';
+
+    if (selectedMonth === 'ALL') {
+      const monthKey = Object.keys(weeksByMonth).find((mk) =>
+        weeksByMonth[mk]?.includes(weekKey)
+      );
+      if (!monthKey) return weekKey.replace('-', ' / ');
+      const index = (weeksByMonth[monthKey] || []).indexOf(weekKey);
+      if (index === -1) return weekKey.replace('-', ' / ');
+      return `${index + 1} неделя ${monthKeyToLabelGenitive(monthKey)}`;
+    }
+
+    const monthWeeks = weeksByMonth[selectedMonth];
+    if (!monthWeeks) return weekKey.replace('-', ' / ');
+    const index = monthWeeks.indexOf(weekKey);
+    if (index === -1) return weekKey.replace('-', ' / ');
+    return `${index + 1} неделя ${monthKeyToLabelGenitive(selectedMonth)}`;
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -165,7 +234,10 @@ function DashboardContent({
           <select
             id="monthSelect"
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
+            onChange={(e) => {
+              setSelectedMonth(e.target.value);
+              setSelectedWeek('ALL');
+            }}
           >
             <option value="ALL">Все месяцы</option>
             {monthKeys.map((m) => (
@@ -183,9 +255,9 @@ function DashboardContent({
             onChange={(e) => setSelectedWeek(e.target.value)}
           >
             <option value="ALL">Все недели</option>
-            {weekKeys.map((w) => (
+            {visibleWeekKeys.map((w) => (
               <option key={w} value={w}>
-                {w.replace('-', ' / ')}
+                {weekLabel(w)}
               </option>
             ))}
           </select>

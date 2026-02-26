@@ -18,7 +18,9 @@ except:
 
 DEFAULT_INPUT_FILES = [
     'nov-feb 11.xlsx',
-    'nov-feb 11 2.xlsx',
+    'nov-feb 11 2.xlsx',   
+    'nov-feb 11 3.xlsx',
+
 ]
 OUTPUT_FILE = 'weekly_report.xlsx'
 BREAKS_FILE = 'breaks_report.xlsx'
@@ -32,7 +34,7 @@ EXCLUDE_NAMES = [
     'Петрухин',
     'Сапаева Мария',
     'Сапаева Светлана',
-    'Все свободные',
+    'Свободная 2', 
     'Сусоева',
     'Ястребова',
 ]

@@ -38,6 +38,10 @@ export default function InsightsPage() {
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [kpiSortKey, setKpiSortKey] = useState<keyof EmployeeKpi>('avgHours');
+  const [kpiSortDir, setKpiSortDir] = useState<'asc' | 'desc'>('desc');
+  const [worstSortKey, setWorstSortKey] = useState<'Сотрудник' | 'Дата' | 'net_seconds'>('net_seconds');
+  const [worstSortDir, setWorstSortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     fetch('/api/data', { credentials: 'include' })
@@ -109,15 +113,34 @@ export default function InsightsPage() {
       });
     });
 
-    return result.sort((a, b) => b.avgHours - a.avgHours);
-  }, [data]);
+    const sorted = [...result];
+    sorted.sort((a, b) => {
+      const dir = kpiSortDir === 'asc' ? 1 : -1;
+      const va = a[kpiSortKey];
+      const vb = b[kpiSortKey];
+      if (typeof va === 'number' && typeof vb === 'number') {
+        return (va - vb) * dir;
+      }
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+    return sorted;
+  }, [data, kpiSortKey, kpiSortDir]);
 
   const worstDays = useMemo(() => {
-    return [...data]
-      .filter((r) => (r.net_seconds || 0) < 6 * 3600)
-      .sort((a, b) => (a.net_seconds || 0) - (b.net_seconds || 0))
-      .slice(0, 30);
-  }, [data]);
+    const filtered = data.filter((r) => (r.net_seconds || 0) < 6 * 3600);
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      const dir = worstSortDir === 'asc' ? 1 : -1;
+      if (worstSortKey === 'net_seconds') {
+        return ((a.net_seconds || 0) - (b.net_seconds || 0)) * dir;
+      }
+      if (worstSortKey === 'Дата') {
+        return a.Дата.localeCompare(b.Дата) * dir;
+      }
+      return a.Сотрудник.localeCompare(b.Сотрудник) * dir;
+    });
+    return sorted.slice(0, 30);
+  }, [data, worstSortKey, worstSortDir]);
 
   const heavySmokers = useMemo(() => {
     return kpis
@@ -137,6 +160,28 @@ export default function InsightsPage() {
     `${Math.round((v || 0) * 100)}%`;
 
   const formatHours = (h: number) => `${h.toFixed(1)} ч`;
+
+  const toggleKpiSort = (key: keyof EmployeeKpi) => {
+    setKpiSortKey((prevKey) => {
+      if (prevKey === key) {
+        setKpiSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+        return prevKey;
+      }
+      setKpiSortDir('desc');
+      return key;
+    });
+  };
+
+  const toggleWorstSort = (key: 'Сотрудник' | 'Дата' | 'net_seconds') => {
+    setWorstSortKey((prevKey) => {
+      if (prevKey === key) {
+        setWorstSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+        return prevKey;
+      }
+      setWorstSortDir(key === 'net_seconds' ? 'asc' : 'asc');
+      return key;
+    });
+  };
 
   if (loading) {
     return (
@@ -199,16 +244,16 @@ export default function InsightsPage() {
           <table>
             <thead>
               <tr>
-                <th>Сотрудник</th>
-                <th>Рабочих дней</th>
-                <th>Среднее чистое время</th>
-                <th>Дней ≥ 8 ч</th>
-                <th>% дней ≥ 8 ч</th>
-                <th>Дней &lt; 7 ч</th>
-                <th>Сред. перекуров/день</th>
-                <th>Сред. длительность перекура</th>
-                <th>Дней &gt; 2 перекуров</th>
-                <th>Дней без обеда</th>
+                <th onClick={() => toggleKpiSort('name')}>Сотрудник</th>
+                <th onClick={() => toggleKpiSort('days')}>Рабочих дней</th>
+                <th onClick={() => toggleKpiSort('avgHours')}>Среднее чистое время</th>
+                <th onClick={() => toggleKpiSort('daysOk')}>Дней ≥ 8 ч</th>
+                <th onClick={() => toggleKpiSort('okShare')}>% дней ≥ 8 ч</th>
+                <th onClick={() => toggleKpiSort('daysLow')}>Дней &lt; 7 ч</th>
+                <th onClick={() => toggleKpiSort('avgSmokes')}>Сред. перекуров/день</th>
+                <th onClick={() => toggleKpiSort('avgSmokeDurationMin')}>Сред. длительность перекура</th>
+                <th onClick={() => toggleKpiSort('daysMoreThanTwoSmokes')}>Дней &gt; 2 перекуров</th>
+                <th onClick={() => toggleKpiSort('daysNoLunch')}>Дней без обеда</th>
                 <th>Статус</th>
               </tr>
             </thead>
@@ -264,9 +309,9 @@ export default function InsightsPage() {
           <table>
             <thead>
               <tr>
-                <th>Сотрудник</th>
-                <th>Дата</th>
-                <th>Чистое время</th>
+                <th onClick={() => toggleWorstSort('Сотрудник')}>Сотрудник</th>
+                <th onClick={() => toggleWorstSort('Дата')}>Дата</th>
+                <th onClick={() => toggleWorstSort('net_seconds')}>Чистое время</th>
               </tr>
             </thead>
             <tbody>

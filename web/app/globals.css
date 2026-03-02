@@ -367,6 +367,38 @@ tbody tr:hover {
   font-weight: 700;
 }
 
+.insights-section {
+  margin-top: 24px;
+}
+
+.insights-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.kpi-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.kpi-status-ok {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.kpi-status-warn {
+  background: rgba(234, 179, 8, 0.2);
+  color: #fde68a;
+}
+
+.kpi-status-bad {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fecaca;
+}
+
 @media (max-width: 768px) {
   .controls {
     flex-direction: column;

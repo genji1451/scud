@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
+import { applyManualOverrides } from '@/lib/manualOverrides';
 
 declare global {
   interface Window {
@@ -27,7 +28,7 @@ export default function DashboardPage() {
         return r.json();
       })
       .then((data) => {
-        setRawData(data);
+        setRawData(applyManualOverrides(data));
         setLoading(false);
       })
       .catch((err) => {

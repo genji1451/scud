@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { applyManualOverrides } from '@/lib/manualOverrides';
 
 type BreakRow = {
   'Время выхода': string;
@@ -50,7 +51,7 @@ export default function InsightsPage() {
         return r.json();
       })
       .then((json) => {
-        setData(json);
+        setData(applyManualOverrides(json));
         setLoading(false);
       })
       .catch((err) => {

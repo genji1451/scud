@@ -58,6 +58,22 @@ EXCLUDE_ROWS = [
     # ('Другой сотрудник', '15.01.2026'),
 ]
 
+# Ручные корректировки дней, когда сотрудник не отметился в системе
+MANUAL_DAILY_ENTRIES = [
+    {
+        'Сотрудник': 'Линник София Владимировна',
+        'Дата': '10.03.2026',
+        'Первый вход': '08:30',
+        'Последний выход': '17:00',
+    },
+    {
+        'Сотрудник': 'Линник София Владимировна',
+        'Дата': '16.03.2026',
+        'Первый вход': '08:30',
+        'Последний выход': '16:54',
+    },
+]
+
 def read_input_files(input_files: list[str]) -> pd.DataFrame:
     dfs: list[pd.DataFrame] = []
     for file in input_files:
@@ -314,6 +330,57 @@ def generate_report():
             # список перерывов для сайта (JSON-совместимый формат)
             'breaks': day_breaks_list if day_breaks_list else []
         })
+
+    # --- Apply Manual Daily Entries ---
+    # Добавляем/перезаписываем выбранные дни вручную (если сотрудник не отметился)
+    for entry in MANUAL_DAILY_ENTRIES:
+        emp_name = entry['Сотрудник']
+        date_str = entry['Дата']
+        first_in_str = entry['Первый вход']
+        last_out_str = entry['Последний выход']
+
+        try:
+            day_date = datetime.datetime.strptime(date_str, '%d.%m.%Y').date()
+            first_in_dt = datetime.datetime.strptime(f'{date_str} {first_in_str}', '%d.%m.%Y %H:%M')
+            last_out_dt = datetime.datetime.strptime(f'{date_str} {last_out_str}', '%d.%m.%Y %H:%M')
+        except Exception:
+            print(f"WARNING: invalid MANUAL_DAILY_ENTRIES item skipped: {entry}")
+            continue
+
+        gross_seconds = max(int((last_out_dt - first_in_dt).total_seconds()), 0)
+        w_hours = gross_seconds // 3600
+        w_minutes = (gross_seconds % 3600) // 60
+        work_time_str = f"{w_hours}ч {w_minutes}м"
+
+        if emp_name not in employee_data:
+            employee_data[emp_name] = {}
+        employee_data[emp_name][day_date] = {'in': first_in_dt, 'out': last_out_dt}
+
+        if day_date not in all_dates:
+            all_dates.append(day_date)
+
+        # Убираем существующую строку за этот день, если есть, и добавляем ручную
+        breaks_summary_rows = [
+            r for r in breaks_summary_rows
+            if not (r['Сотрудник'] == emp_name and r['Дата'] == date_str)
+        ]
+        breaks_summary_rows.append({
+            'Сотрудник': emp_name,
+            'Дата': date_str,
+            'Первый вход': first_in_str,
+            'Последний выход': last_out_str,
+            'Количество выходов': "-",
+            'Общее время отсутствия': "-",
+            'Чистое рабочее время': work_time_str,
+            'net_seconds': gross_seconds,
+            'net_minus_lunch_seconds': gross_seconds,
+            'net_minus_smoke_seconds': gross_seconds,
+            'lunch_seconds': 0,
+            'smoke_seconds': 0,
+            'breaks': [],
+        })
+
+    all_dates = sorted(all_dates)
 
     # --- Create DataFrames ---
     

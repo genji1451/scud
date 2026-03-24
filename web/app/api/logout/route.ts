@@ -7,5 +7,10 @@ export async function POST() {
     maxAge: 0,
     path: '/',
   });
+  response.cookies.set('work_report_role', '', {
+    httpOnly: true,
+    maxAge: 0,
+    path: '/',
+  });
   return response;
 }

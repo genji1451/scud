@@ -23198,28 +23198,6 @@
   },
   {
     "Сотрудник": "Линник София Владимировна",
-    "Дата": "16.03.2026",
-    "Первый вход": "13:12",
-    "Последний выход": "16:54",
-    "net_seconds": 13051,
-    "work_hours": 3.625277777777778,
-    "net_minus_lunch_seconds": 13281,
-    "work_minus_lunch_hours": 3.6891666666666665,
-    "net_minus_smoke_seconds": 13051,
-    "work_minus_smoke_hours": 3.625277777777778,
-    "lunch_seconds": 0,
-    "smoke_seconds": 230,
-    "breaks": [
-      {
-        "Время выхода": "13:09",
-        "Время возвращения": "13:12",
-        "Длительность_сек": 230,
-        "Тип": "Перекур"
-      }
-    ]
-  },
-  {
-    "Сотрудник": "Линник София Владимировна",
     "Дата": "17.03.2026",
     "Первый вход": "08:45",
     "Последний выход": "17:25",
@@ -60167,6 +60145,36 @@
     "work_minus_lunch_hours": 0.0,
     "net_minus_smoke_seconds": 0,
     "work_minus_smoke_hours": 0.0,
+    "lunch_seconds": 0,
+    "smoke_seconds": 0,
+    "breaks": []
+  },
+  {
+    "Сотрудник": "Линник София Владимировна",
+    "Дата": "10.03.2026",
+    "Первый вход": "08:30",
+    "Последний выход": "17:00",
+    "net_seconds": 30600,
+    "work_hours": 8.5,
+    "net_minus_lunch_seconds": 30600,
+    "work_minus_lunch_hours": 8.5,
+    "net_minus_smoke_seconds": 30600,
+    "work_minus_smoke_hours": 8.5,
+    "lunch_seconds": 0,
+    "smoke_seconds": 0,
+    "breaks": []
+  },
+  {
+    "Сотрудник": "Линник София Владимировна",
+    "Дата": "16.03.2026",
+    "Первый вход": "08:30",
+    "Последний выход": "16:54",
+    "net_seconds": 30240,
+    "work_hours": 8.4,
+    "net_minus_lunch_seconds": 30240,
+    "work_minus_lunch_hours": 8.4,
+    "net_minus_smoke_seconds": 30240,
+    "work_minus_smoke_hours": 8.4,
     "lunch_seconds": 0,
     "smoke_seconds": 0,
     "breaks": []

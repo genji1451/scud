@@ -88,6 +88,15 @@ select {
   outline: none;
 }
 
+input {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #020617;
+  color: #e5e7eb;
+  outline: none;
+}
+
 .summary-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

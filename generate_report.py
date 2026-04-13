@@ -139,9 +139,12 @@ def generate_report():
     df = df[df['Событие'].isin(valid_events)]
     
     # Create Full Name
-    df['Full Name'] = df['Фамилия'].astype(str) + ' ' + \
-                      df['Имя'].astype(str).replace('nan', '') + ' ' + \
-                      df['Отчество'].astype(str).replace('nan', '')
+    # Важно: используем fillna(''), иначе сотрудники без отчества могут превращаться в NaN и выпадать.
+    df['Full Name'] = (
+        df['Фамилия'].fillna('').astype(str).str.strip() + ' ' +
+        df['Имя'].fillna('').astype(str).str.strip() + ' ' +
+        df['Отчество'].fillna('').astype(str).str.strip()
+    )
     df['Full Name'] = df['Full Name'].str.strip()
     df['Full Name'] = df['Full Name'].replace(NAME_REMAP)
     

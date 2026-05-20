@@ -26,7 +26,7 @@ DEFAULT_INPUT_FILES = [
     'nov-feb 11 7.xlsx',
     'nov-feb 11 8.xlsx',
     'nov-feb 11 9.xlsx',
-
+    'nov-feb 11 10.xlsx',
 ]
 OUTPUT_FILE = 'weekly_report.xlsx'
 BREAKS_FILE = 'breaks_report.xlsx'

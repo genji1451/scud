@@ -77,7 +77,8 @@ export default function DashboardPage() {
     function hydrateRows(data: WorkRow[]) {
       const rows = applyManualOverrides(data);
       setRawData(rows);
-      const dates = rows.map((row) => parseDate(row.Дата)).sort((a, b) => a.getTime() - b.getTime());
+      const completedRows = enrichRows(rows);
+      const dates = completedRows.map((row) => parseDate(row.Дата)).sort((a, b) => a.getTime() - b.getTime());
       if (dates.length) {
         setCustomStart(toInputDate(dates[0]));
         setCustomEnd(toInputDate(dates[dates.length - 1]));

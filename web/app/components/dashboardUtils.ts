@@ -1,12 +1,21 @@
 import type { EnrichedWorkRow, PeriodMode, WorkRow } from './types';
 
 export function enrichRows(rows: WorkRow[]): EnrichedWorkRow[] {
-  return rows;
+  return excludeCurrentDay(rows);
 }
 
 export function parseDate(value: string) {
   const [day, month, year] = value.split('.').map(Number);
   return new Date(year, month - 1, day);
+}
+
+export function dateKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+export function excludeCurrentDay<T extends { Дата: string }>(rows: T[]) {
+  const today = dateKey(new Date());
+  return rows.filter((row) => dateKey(parseDate(row.Дата)) !== today);
 }
 
 export function toInputDate(value: Date) {
@@ -59,33 +68,34 @@ export function getBreakSeconds(row: EnrichedWorkRow, predicate: (type: string) 
 }
 
 export function filterByPeriod(rows: EnrichedWorkRow[], mode: PeriodMode, customStart: string, customEnd: string) {
-  if (!rows.length) return rows;
-  const sorted = [...rows].sort((a, b) => parseDate(a.Дата).getTime() - parseDate(b.Дата).getTime());
+  const completedRows = excludeCurrentDay(rows);
+  if (!completedRows.length) return completedRows;
+  const sorted = [...completedRows].sort((a, b) => parseDate(a.Дата).getTime() - parseDate(b.Дата).getTime());
   const latest = sorted[sorted.length - 1];
 
-  if (mode === 'day') return rows.filter((row) => row.Дата === latest.Дата);
+  if (mode === 'day') return completedRows.filter((row) => row.Дата === latest.Дата);
   if (mode === 'week') {
     const week = getYearWeek(latest.Дата);
-    return rows.filter((row) => getYearWeek(row.Дата) === week);
+    return completedRows.filter((row) => getYearWeek(row.Дата) === week);
   }
   if (mode === 'month') {
     const month = getMonthKey(latest.Дата);
-    return rows.filter((row) => getMonthKey(row.Дата) === month);
+    return completedRows.filter((row) => getMonthKey(row.Дата) === month);
   }
   if (mode === 'quarter') {
     const quarter = getQuarterKey(latest.Дата);
-    return rows.filter((row) => getQuarterKey(row.Дата) === quarter);
+    return completedRows.filter((row) => getQuarterKey(row.Дата) === quarter);
   }
   if (customStart && customEnd) {
     const start = new Date(customStart);
     const end = new Date(customEnd);
     end.setHours(23, 59, 59, 999);
-    return rows.filter((row) => {
+    return completedRows.filter((row) => {
       const date = parseDate(row.Дата);
       return date >= start && date <= end;
     });
   }
-  return rows;
+  return completedRows;
 }
 
 export function getPeriodLabel(rows: EnrichedWorkRow[]) {

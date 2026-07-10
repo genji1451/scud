@@ -167,6 +167,12 @@ def generate_report():
     # Удаляем весь ноябрь (месяц == 11) и все выходные (суббота/воскресенье)
     df = df[df['Datetime'].dt.month != 11]
     df = df[df['Datetime'].dt.weekday < 5]
+    today = datetime.date.today()
+    before_today_filter = len(df)
+    df = df[df['Date'] != today]
+    removed_today = before_today_filter - len(df)
+    if removed_today:
+        print(f"Excluded current incomplete day ({today.strftime('%d.%m.%Y')}): {removed_today} events.")
     
     # Determine Direction
     def get_direction(row):

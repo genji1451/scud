@@ -18,7 +18,7 @@ import {
   YAxis,
 } from 'recharts';
 import { AppShell } from '@/app/components/AppShell';
-import { ChartCard, DataTable, FilterBar, ImportStatusCard, StatCard } from '@/app/components/DashboardParts';
+import { ChartCard, DataTable, FilterBar, StatCard } from '@/app/components/DashboardParts';
 import {
   enrichRows,
   filterByPeriod,
@@ -145,13 +145,6 @@ export default function DashboardPage() {
         customEnd={customEnd}
         onCustomStartChange={setCustomStart}
         onCustomEndChange={setCustomEnd}
-      />
-
-      <ImportStatusCard
-        lastImport={analytics.lastImport}
-        period={analytics.periodLabel}
-        employees={analytics.totalEmployees}
-        fileName="work_summary.json"
       />
 
       <section className="stats-grid" id="analytics">

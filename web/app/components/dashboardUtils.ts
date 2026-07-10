@@ -83,8 +83,16 @@ export function filterByPeriod(rows: EnrichedWorkRow[], mode: PeriodMode, custom
     return completedRows.filter((row) => getMonthKey(row.Дата) === month);
   }
   if (mode === 'quarter') {
-    const quarter = getQuarterKey(latest.Дата);
-    return completedRows.filter((row) => getQuarterKey(row.Дата) === quarter);
+    const end = parseDate(latest.Дата);
+    end.setHours(23, 59, 59, 999);
+    const start = new Date(end);
+    start.setMonth(start.getMonth() - 3);
+    start.setDate(start.getDate() + 1);
+    start.setHours(0, 0, 0, 0);
+    return completedRows.filter((row) => {
+      const date = parseDate(row.Дата);
+      return date >= start && date <= end;
+    });
   }
   if (customStart && customEnd) {
     const start = new Date(customStart);

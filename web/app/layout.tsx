@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Отчет по рабочему времени',
-  description: 'Дашборд учета рабочего времени сотрудников',
+  title: 'НОКС | Учет рабочего времени',
+  description: 'Dashboard отчетов по рабочему времени сотрудников',
+  icons: {
+    icon: '/noks-icon.svg',
+  },
 };
 
 export default function RootLayout({

@@ -2,29 +2,31 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
-  Building2,
   CalendarDays,
   FileBarChart,
   LayoutDashboard,
   LogOut,
-  Settings,
   Table2,
   UploadCloud,
   Users,
 } from 'lucide-react';
 
+type UserRole = 'admin' | 'super_admin' | string;
+
 const navItems = [
   { label: 'Обзор', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Сотрудники', href: '/dashboard#employees', icon: Users },
-  { label: 'Отделы', href: '/dashboard#departments', icon: Building2 },
-  { label: 'Отчеты', href: '/dashboard#reports', icon: FileBarChart },
-  { label: 'Графики работы', href: '/dashboard#charts', icon: CalendarDays },
+  { label: 'Графики', href: '/dashboard#charts', icon: CalendarDays },
   { label: 'Табель', href: '/dashboard#timesheet', icon: Table2 },
+  { label: 'Отчеты', href: '/dashboard#reports', icon: FileBarChart },
   { label: 'Аналитика', href: '/dashboard#analytics', icon: BarChart3 },
-  { label: 'Импорт данных', href: '/import', icon: UploadCloud },
-  { label: 'Настройки', href: '/dashboard#settings', icon: Settings },
+];
+
+const adminOnlyItems = [
+  { label: 'Импорт', href: '/import', icon: UploadCloud },
 ];
 
 type AppShellProps = {
@@ -37,20 +39,35 @@ type AppShellProps = {
 
 export function AppShell({ title, subtitle, lastImport, onLogout, children }: AppShellProps) {
   const pathname = usePathname();
+  const [role, setRole] = useState<UserRole>('admin');
+
+  useEffect(() => {
+    fetch('/api/me', { credentials: 'include', cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.role) setRole(data.role);
+      })
+      .catch(() => setRole('admin'));
+  }, []);
+
+  const menu = useMemo(
+    () => (role === 'super_admin' ? [...navItems, ...adminOnlyItems] : navItems),
+    [role],
+  );
 
   return (
     <div className="admin-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">Н</div>
+        <Link href="/dashboard" className="brand" aria-label="НОКС: перейти к обзору">
+          <img src="/noks-icon.svg" width={42} height={42} alt="" className="brand-logo" />
           <div>
             <div className="brand-title">НОКС</div>
             <div className="brand-subtitle">Учет рабочего времени</div>
           </div>
-        </div>
+        </Link>
 
-        <nav className="sidebar-nav">
-          {navItems.map((item) => {
+        <nav className="sidebar-nav" aria-label="Основное меню">
+          {menu.map((item) => {
             const Icon = item.icon;
             const active = item.href === '/dashboard' ? pathname === '/dashboard' : pathname === item.href;
             return (
@@ -61,29 +78,19 @@ export function AppShell({ title, subtitle, lastImport, onLogout, children }: Ap
             );
           })}
         </nav>
-
-        <div className="sidebar-note">
-          <span>Режим данных</span>
-          <strong>Ручная выгрузка</strong>
-        </div>
       </aside>
 
       <div className="main-panel">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Панель начальника</p>
             <h1>{title}</h1>
             {subtitle && <p className="topbar-subtitle">{subtitle}</p>}
           </div>
           <div className="topbar-meta">
-            <div className="status-pill">Данные загружены вручную</div>
+            <div className="status-pill">Ручная выгрузка</div>
             <div className="meta-card">
               <span>Последний импорт</span>
               <strong>{lastImport}</strong>
-            </div>
-            <div className="user-card">
-              <span>Пользователь</span>
-              <strong>Начальник</strong>
             </div>
             {onLogout && (
               <button type="button" className="icon-button" onClick={onLogout} aria-label="Выйти">

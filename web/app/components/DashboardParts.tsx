@@ -9,10 +9,7 @@ export function FilterBar({
   onPeriodModeChange,
   employee,
   onEmployeeChange,
-  department,
-  onDepartmentChange,
   employees,
-  departments,
   customStart,
   customEnd,
   onCustomStartChange,
@@ -22,10 +19,7 @@ export function FilterBar({
   onPeriodModeChange: (value: PeriodMode) => void;
   employee: string;
   onEmployeeChange: (value: string) => void;
-  department: string;
-  onDepartmentChange: (value: string) => void;
   employees: string[];
-  departments: string[];
   customStart: string;
   customEnd: string;
   onCustomStartChange: (value: string) => void;
@@ -36,11 +30,11 @@ export function FilterBar({
     { label: 'Неделя', value: 'week' },
     { label: 'Месяц', value: 'month' },
     { label: 'Квартал', value: 'quarter' },
-    { label: 'Произвольный период', value: 'custom' },
+    { label: 'Период', value: 'custom' },
   ];
 
   return (
-    <section className="filter-bar">
+    <section className="filter-bar" aria-label="Фильтры отчета">
       <div className="segmented-control">
         {periods.map((item) => (
           <button
@@ -66,17 +60,6 @@ export function FilterBar({
         <select value={employee} onChange={(event) => onEmployeeChange(event.target.value)}>
           <option value="ALL">Все сотрудники</option>
           {employees.map((item) => (
-            <option key={item} value={item}>{item}</option>
-          ))}
-        </select>
-        <ChevronDown size={16} />
-      </label>
-
-      <label className="select-wrap">
-        <span>Отдел</span>
-        <select value={department} onChange={(event) => onDepartmentChange(event.target.value)}>
-          <option value="ALL">Все отделы</option>
-          {departments.map((item) => (
             <option key={item} value={item}>{item}</option>
           ))}
         </select>
@@ -110,14 +93,16 @@ export function StatCard({ label, value, note, tone = 'default', delay = 0 }: {
   );
 }
 
-export function ChartCard({ title, subtitle, children, wide = false }: {
+export function ChartCard({ title, subtitle, children, wide = false, id }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   wide?: boolean;
+  id?: string;
 }) {
   return (
     <motion.section
+      id={id}
       className={`chart-card ${wide ? 'wide' : ''}`}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -163,11 +148,15 @@ export function DataTable<T extends Record<string, React.ReactNode>>({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {rows.length ? rows.map((row, index) => (
               <tr key={index}>
                 {columns.map((column) => <td key={String(column.key)}>{row[column.key]}</td>)}
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={columns.length}>Нет данных для выбранных фильтров</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -190,7 +179,7 @@ export function ImportStatusCard({
     <section className="import-status-card">
       <div className="import-icon"><UploadCloud size={24} /></div>
       <div>
-        <p className="eyebrow">Последняя ручная выгрузка</p>
+        <p className="eyebrow">Последняя выгрузка</p>
         <h2>{fileName}</h2>
         <div className="import-grid">
           <span><Calendar size={15} /> {lastImport}</span>

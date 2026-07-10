@@ -16,8 +16,6 @@ export type WorkRow = {
   breaks: BreakItem[];
 };
 
-export type EnrichedWorkRow = WorkRow & {
-  department: string;
-};
+export type EnrichedWorkRow = WorkRow;
 
 export type PeriodMode = 'day' | 'week' | 'month' | 'quarter' | 'custom';

@@ -22,7 +22,6 @@ import { ChartCard, DataTable, FilterBar, ImportStatusCard, StatCard } from '@/a
 import {
   enrichRows,
   filterByPeriod,
-  formatHours,
   formatSeconds,
   getBreakSeconds,
   getPeriodLabel,
@@ -43,7 +42,6 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [periodMode, setPeriodMode] = useState<PeriodMode>('month');
   const [selectedEmployee, setSelectedEmployee] = useState('ALL');
-  const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
@@ -56,7 +54,7 @@ export default function DashboardPage() {
         if (!response.ok) throw new Error('Данные не загружены');
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-          throw new Error('Сессия входа истекла. Откройте /login и войдите заново.');
+          throw new Error('Сессия истекла. Откройте /login и войдите заново.');
         }
         const data = await response.json() as WorkRow[];
         if (!cancelled) hydrateRows(data);
@@ -102,21 +100,19 @@ export default function DashboardPage() {
 
   const rows = useMemo(() => enrichRows(rawData), [rawData]);
   const employees = useMemo(() => Array.from(new Set(rows.map((row) => row.Сотрудник))).sort(), [rows]);
-  const departments = useMemo(() => Array.from(new Set(rows.map((row) => row.department))).sort(), [rows]);
 
   const filteredRows = useMemo(() => {
     let next = filterByPeriod(rows, periodMode, customStart, customEnd);
     if (selectedEmployee !== 'ALL') next = next.filter((row) => row.Сотрудник === selectedEmployee);
-    if (selectedDepartment !== 'ALL') next = next.filter((row) => row.department === selectedDepartment);
     return next;
-  }, [rows, periodMode, customStart, customEnd, selectedEmployee, selectedDepartment]);
+  }, [rows, periodMode, customStart, customEnd, selectedEmployee]);
 
   const analytics = useMemo(() => buildAnalytics(filteredRows, rows), [filteredRows, rows]);
 
   if (loading) {
     return (
       <div className="loading-screen">
-        <div className="loader-card">Загрузка ручной выгрузки СКУД...</div>
+        <div className="loader-card">Загрузка выгрузки СКУД...</div>
       </div>
     );
   }
@@ -135,7 +131,7 @@ export default function DashboardPage() {
   return (
     <AppShell
       title="Обзор"
-      subtitle="Сводка по рабочему времени на основе вручную загруженных отчетов"
+      subtitle="Отчет по рабочему времени на основе загруженной выгрузки СКУД"
       lastImport={analytics.lastImport}
       onLogout={handleLogout}
     >
@@ -144,10 +140,7 @@ export default function DashboardPage() {
         onPeriodModeChange={setPeriodMode}
         employee={selectedEmployee}
         onEmployeeChange={setSelectedEmployee}
-        department={selectedDepartment}
-        onDepartmentChange={setSelectedDepartment}
         employees={employees}
-        departments={departments}
         customStart={customStart}
         customEnd={customEnd}
         onCustomStartChange={setCustomStart}
@@ -161,7 +154,7 @@ export default function DashboardPage() {
         fileName="work_summary.json"
       />
 
-      <section className="stats-grid">
+      <section className="stats-grid" id="analytics">
         {analytics.cards.map((card, index) => (
           <StatCard key={card.label} {...card} delay={index * 0.035} />
         ))}
@@ -188,25 +181,25 @@ export default function DashboardPage() {
                   <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatHours(Number(value))} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(value) => formatSeconds(Number(value) * 3600)} />
               <Legend iconType="circle" wrapperStyle={{ color: '#CBD5E1' }} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="По отделам" subtitle="Суммарные часы по подразделениям">
+        <ChartCard title="Топ сотрудников" subtitle="Суммарные часы в выбранном периоде">
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analytics.departmentChart} layout="vertical" margin={{ left: 24 }}>
+            <BarChart data={analytics.employeeChart} layout="vertical" margin={{ left: 24 }}>
               <CartesianGrid stroke="rgba(255,255,255,0.08)" horizontal={false} />
               <XAxis type="number" stroke="#94A3B8" tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="department" stroke="#94A3B8" width={110} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="employee" stroke="#94A3B8" width={130} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(176,24,75,0.12)' }} />
               <Bar dataKey="hours" name="Часы" radius={[0, 10, 10, 0]} fill="#9A123F" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Динамика рабочего времени" subtitle="Линия тренда и объем по дням" wide>
+        <ChartCard title="Динамика рабочего времени" subtitle="Линия тренда по дням" wide>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={analytics.dailyChart}>
               <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
@@ -219,15 +212,12 @@ export default function DashboardPage() {
         </ChartCard>
       </section>
 
-      <DepartmentSummary rows={analytics.departmentChart} />
-
       <DataTable
         id="employees"
         title="Сотрудники"
         subtitle="Итоги по каждому сотруднику в выбранном периоде"
         columns={[
           { key: 'employee', label: 'Сотрудник' },
-          { key: 'department', label: 'Отдел' },
           { key: 'workTime', label: 'Рабочее время' },
           { key: 'breaks', label: 'Перерывы' },
           { key: 'lunches', label: 'Обеды' },
@@ -297,7 +287,6 @@ function buildAnalytics(filteredRows: EnrichedWorkRow[], allRows: EnrichedWorkRo
       const days = new Set(value.map((row) => row.Дата)).size;
       return {
         employee: key,
-        department: value[0]?.department || 'Без отдела',
         work,
         breaks,
         lunches,
@@ -319,13 +308,10 @@ function buildAnalytics(filteredRows: EnrichedWorkRow[], allRows: EnrichedWorkRo
     }))
     .sort((a, b) => parseDate(a.fullDate).getTime() - parseDate(b.fullDate).getTime());
 
-  const departmentChart = groupBy(filteredRows, (row) => row.department)
-    .map(({ key, value }) => ({
-      department: key,
-      employees: new Set(value.map((row) => row.Сотрудник)).size,
-      hours: Number((sumSeconds(value, (row) => row.net_seconds) / 3600).toFixed(2)),
-    }))
-    .sort((a, b) => b.hours - a.hours);
+  const employeeChart = byEmployee.slice(0, 8).map((item) => ({
+    employee: item.employee.split(' ').slice(0, 2).join(' '),
+    hours: Number((item.work / 3600).toFixed(2)),
+  }));
 
   return {
     totalEmployees,
@@ -336,13 +322,13 @@ function buildAnalytics(filteredRows: EnrichedWorkRow[], allRows: EnrichedWorkRo
       { label: 'Отработано всего', value: formatSeconds(totalWorkSeconds), note: 'Чистое рабочее время', tone: 'accent' as const },
       { label: 'Перерывы всего', value: formatSeconds(breaksSeconds), note: 'Без учета обедов' },
       { label: 'Обеды всего', value: formatSeconds(lunchSeconds), note: 'По отметкам СКУД' },
-      { label: 'Средняя продолжительность рабочего дня', value: formatSeconds(avgDay), note: `${workingDays} рабочих дней` },
+      { label: 'Средний рабочий день', value: formatSeconds(avgDay), note: `${workingDays} рабочих дней` },
       { label: 'Самый продуктивный сотрудник', value: productive?.employee || '-', note: productive ? formatSeconds(productive.work) : undefined, tone: 'accent' as const },
       { label: 'Максимум перерывов', value: breakLeader?.employee || '-', note: breakLeader ? formatSeconds(breakLeader.breaks) : undefined },
-      { label: 'Количество рабочих дней', value: String(workingDays), note: 'Уникальные даты периода' },
+      { label: 'Рабочих дней', value: String(workingDays), note: 'Уникальные даты периода' },
     ],
     dailyChart,
-    departmentChart,
+    employeeChart,
     timeStructure: [
       { name: 'Рабочее время', value: Number((totalWorkSeconds / 3600).toFixed(2)) },
       { name: 'Обеды', value: Number((lunchSeconds / 3600).toFixed(2)) },
@@ -351,7 +337,6 @@ function buildAnalytics(filteredRows: EnrichedWorkRow[], allRows: EnrichedWorkRo
     ].filter((item) => item.value > 0),
     employeeRows: byEmployee.map((item) => ({
       employee: item.employee,
-      department: item.department,
       workTime: formatSeconds(item.work),
       breaks: formatSeconds(item.breaks),
       lunches: formatSeconds(item.lunches),
@@ -384,28 +369,6 @@ function buildAnalytics(filteredRows: EnrichedWorkRow[], allRows: EnrichedWorkRo
       })))
       .slice(0, 160),
   };
-}
-
-function DepartmentSummary({ rows }: { rows: Array<{ department: string; employees: number; hours: number }> }) {
-  return (
-    <section className="department-summary" id="departments">
-      <div className="section-heading">
-        <div>
-          <h2>Отделы</h2>
-          <p>Сводка по подразделениям с учетом файла соответствия сотрудников</p>
-        </div>
-      </div>
-      <div className="department-grid">
-        {rows.map((row) => (
-          <div className="department-card" key={row.department}>
-            <span>{row.department}</span>
-            <strong>{formatHours(row.hours)}</strong>
-            <p>{row.employees} сотрудников</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 const tooltipStyle = {

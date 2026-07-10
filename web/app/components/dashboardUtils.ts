@@ -1,11 +1,7 @@
-import { getEmployeeDepartment } from '@/data/employees';
 import type { EnrichedWorkRow, PeriodMode, WorkRow } from './types';
 
 export function enrichRows(rows: WorkRow[]): EnrichedWorkRow[] {
-  return rows.map((row) => ({
-    ...row,
-    department: getEmployeeDepartment(row.Сотрудник),
-  }));
+  return rows;
 }
 
 export function parseDate(value: string) {

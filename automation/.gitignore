@@ -1,3 +1,4 @@
 downloads/
 tmp_chunks/
+__pycache__/
 *.tmp.js
